@@ -1,10 +1,50 @@
+// ── Global crash handler (MUST be first) ─────────────────────────────────────
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught Exception:', err.message, err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled Rejection:', reason);
+});
+
+console.log('[BOOT] Starting server.js…');
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
-const axios = require('axios');
-const cron = require('node-cron');
-const { fetchAndProcessData, getDB } = require('./scripts/fetch_data');
+
+let axios, cron, fetchAndProcessData, getDB;
+
+try {
+    axios = require('axios');
+    console.log('[BOOT] axios loaded ✓');
+} catch (e) {
+    console.error('[BOOT] axios failed:', e.message);
+}
+
+try {
+    cron = require('node-cron');
+    console.log('[BOOT] node-cron loaded ✓');
+} catch (e) {
+    console.error('[BOOT] node-cron failed:', e.message);
+}
+
+try {
+    const fetchModule = require('./scripts/fetch_data');
+    fetchAndProcessData = fetchModule.fetchAndProcessData;
+    getDB = fetchModule.getDB;
+    console.log('[BOOT] fetch_data loaded ✓');
+} catch (e) {
+    console.error('[BOOT] fetch_data failed:', e.message);
+    // Provide fallback so server still starts
+    getDB = () => Promise.resolve({
+        get: async () => null,
+        all: async () => [],
+        run: async () => {},
+        close: async () => {}
+    });
+    fetchAndProcessData = async () => null;
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -112,25 +152,34 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
-// ── Scheduler ─────────────────────────────────────────────────────────────────
-async function runFetchTask(label) {
-    console.log(`[${new Date().toISOString()}] ${label} fetch starting…`);
-    try {
-        await fetchAndProcessData();
-        console.log(`[${new Date().toISOString()}] ${label} fetch completed.`);
-    } catch (err) {
-        console.error(`[${new Date().toISOString()}] ${label} fetch failed:`, err.message);
-    }
-}
-
-// Mon-Fri: Every 15 mins during market hours (9:15 AM - 3:30 PM IST = 3:45-10:00 UTC)
-cron.schedule('*/15 3-10 * * 1-5', () => runFetchTask('Cron'));
-cron.schedule('45 10 * * 1-5', () => runFetchTask('Post-market-1'));
-cron.schedule('0 12 * * 1-5', () => runFetchTask('Post-market-2'));
-
-// ── Start ─────────────────────────────────────────────────────────────────────
+// ── Start server FIRST (before anything else) ───────────────────────────────
+console.log(`[BOOT] Attempting to listen on 0.0.0.0:${PORT}…`);
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`[BOOT] ✅ Server running on port ${PORT}`);
+
+    // ── Scheduler (deferred until server is listening) ─────────────────────
+    if (cron) {
+        try {
+            async function runFetchTask(label) {
+                console.log(`[${new Date().toISOString()}] ${label} fetch starting…`);
+                try {
+                    await fetchAndProcessData();
+                    console.log(`[${new Date().toISOString()}] ${label} fetch completed.`);
+                } catch (err) {
+                    console.error(`[${new Date().toISOString()}] ${label} fetch failed:`, err.message);
+                }
+            }
+            // Mon-Fri: Every 15 mins during market hours (9:15 AM - 3:30 PM IST = 3:45-10:00 UTC)
+            cron.schedule('*/15 3-10 * * 1-5', () => runFetchTask('Cron'));
+            cron.schedule('45 10 * * 1-5', () => runFetchTask('Post-market-1'));
+            cron.schedule('0 12 * * 1-5', () => runFetchTask('Post-market-2'));
+            console.log('[BOOT] ✅ Cron jobs scheduled');
+        } catch (e) {
+            console.error('[BOOT] Cron scheduling failed:', e.message);
+        }
+    } else {
+        console.warn('[BOOT] ⚠ node-cron not available, skipping scheduler');
+    }
 });
 
 module.exports = app;
