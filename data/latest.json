@@ -25,7 +25,5 @@
   "fii_idx_put_short": 559315,
   "fii_idx_put_net": 238788,
   "_updated_at": "19 Mar 2026, 10:31 pm IST",
-  "_source": "fetch-pipeline",
-  "pcr": 0.57,
-  "sentiment_score": 0
+  "_source": "fetch-pipeline"
 }
