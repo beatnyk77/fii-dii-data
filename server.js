@@ -182,6 +182,38 @@ app.get('/api/fno', async (req, res) => {
             },
             timeout: 10000,
         });
+
+        // Persist F&O data into latest.json so fallback works
+        try {
+            const latestPath = require('path').join(DATA_DIR, 'latest.json');
+            if (fs.existsSync(latestPath) && Array.isArray(data) && data.length > 0) {
+                const latest = JSON.parse(fs.readFileSync(latestPath, 'utf8'));
+                for (const row of data) {
+                    const cat = (row.clientType || row.category || '').toUpperCase().trim();
+                    if (cat.includes('FII') || cat === 'FPI') {
+                        latest.fii_idx_fut_long  = parseFloat(row.futIndexLong  || 0);
+                        latest.fii_idx_fut_short = parseFloat(row.futIndexShort || 0);
+                        latest.fii_stk_fut_long  = parseFloat(row.futStockLong  || 0);
+                        latest.fii_stk_fut_short = parseFloat(row.futStockShort || 0);
+                        latest.fii_idx_call_long  = parseFloat(row.optIdxCallLong  || 0);
+                        latest.fii_idx_call_short = parseFloat(row.optIdxCallShort || 0);
+                        latest.fii_idx_put_long   = parseFloat(row.optIdxPutLong   || 0);
+                        latest.fii_idx_put_short  = parseFloat(row.optIdxPutShort  || 0);
+                    } else if (cat.includes('DII')) {
+                        latest.dii_idx_fut_long  = parseFloat(row.futIndexLong  || 0);
+                        latest.dii_idx_fut_short = parseFloat(row.futIndexShort || 0);
+                        latest.dii_stk_fut_long  = parseFloat(row.futStockLong  || 0);
+                        latest.dii_stk_fut_short = parseFloat(row.futStockShort || 0);
+                    }
+                }
+                latest._fno_updated_at = new Date().toISOString();
+                fs.writeFileSync(latestPath, JSON.stringify(latest, null, 2));
+                console.log('[API] F&O data saved to latest.json');
+            }
+        } catch (writeErr) {
+            console.error('[API] Failed to persist F&O data:', writeErr.message);
+        }
+
         res.json(data);
     } catch (err) {
         console.error('[API] /api/fno error:', err.message);

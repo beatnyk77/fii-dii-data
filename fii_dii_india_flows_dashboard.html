@@ -2301,7 +2301,7 @@ function renderDashboard() {
   // Render Flow Strength Meter
 // Wait 2 seconds for JS execution before doing the rest
   // ── Render F&O Data (if available in latest) ───────────────────────────────
-  const latestFno = dailyData.find(d => d.fii_idx_fut_long !== undefined) || latest;
+  const latestFno = dailyData.find(d => (d.fii_idx_fut_long || 0) > 0 || (d.fii_idx_fut_short || 0) > 0) || latest;
 
   if (latestFno.fii_idx_fut_long !== undefined) {
     const fnl = n => n ? n.toLocaleString('en-IN') : '0';
@@ -3036,7 +3036,13 @@ async function fetchFnoData() {
       }
 
       // Only merge if we got at least one meaningful value
-      if (fnoRow.fii_idx_fut_long !== undefined) {
+      if (fnoRow.fii_idx_fut_long !== undefined && (fnoRow.fii_idx_fut_long > 0 || fnoRow.fii_idx_fut_short > 0)) {
+        // Inject today's date so the F&O section shows the correct date
+        const today = new Date();
+        const dd = today.getDate().toString().padStart(2,'0');
+        const mmm = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][today.getMonth()];
+        const yyyy = today.getFullYear();
+        fnoRow.d = `${dd}-${mmm}-${yyyy}`;
         dailyData[0] = { ...dailyData[0], ...fnoRow };
         console.log('[SYNC] ✅ F&O participant-wise OI updated from:', proxyUrl);
         renderDashboard(); // Re-render to update F&O section
@@ -3046,6 +3052,19 @@ async function fetchFnoData() {
   }
   console.log('[SYNC] F&O: Could not fetch from any source, using existing data');
 }
+
+// F&O Auto-Refresh: every 5 minutes during market hours (9:15 AM - 4:00 PM IST)
+setInterval(async () => {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const h = ist.getHours();
+  const day = ist.getDay();
+  // Only auto-fetch on weekdays during 9:15 AM - 4:30 PM IST
+  if (day >= 1 && day <= 5 && h >= 9 && h <= 16) {
+    console.log('[AUTO] F&O auto-refresh triggered');
+    try { await fetchFnoData(); } catch(e) { /* silent */ }
+  }
+}, 5 * 60 * 1000); // 5 minutes
 
 window.toggleSectorChart = function() {
     const card = document.getElementById('sec-chart-card');
