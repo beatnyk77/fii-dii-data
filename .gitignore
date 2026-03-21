@@ -34,3 +34,11 @@ __pycache__/
 # Secrets / environment
 .env
 .env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# PM2
+.pm2/
