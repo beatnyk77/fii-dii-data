@@ -27,6 +27,10 @@ __pycache__/
 # Secrets / environment
 .env
 .env.local
+.vapid-keys.json
 
 # Legacy database (migrated to JSON)
 data/fiidii.db
+
+# Push notification subscriptions (runtime data)
+data/subscriptions.json

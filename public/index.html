@@ -10,6 +10,14 @@
 <meta name="author" content="Mr. Chartist - FII & DII Data">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <link rel="canonical" href="https://fii-diidata.mrchartist.com/">
+<link rel="alternate" hreflang="en-IN" href="https://fii-diidata.mrchartist.com/">
+<link rel="alternate" hreflang="en" href="https://fii-diidata.mrchartist.com/">
+<link rel="alternate" hreflang="x-default" href="https://fii-diidata.mrchartist.com/">
+
+<!-- LLM / AI Discoverability -->
+<meta name="ai:description" content="India's most comprehensive real-time tracker for FII (Foreign Institutional Investor) and DII (Domestic Institutional Investor) money flows. Provides daily cash market data, F&O derivatives positioning, sector-wise FPI allocation, 45-day heatmaps, and flow analytics matrices. Free and open-source by Mr. Chartist.">
+<meta name="ai:keywords" content="FII DII data India, institutional money flow, NSE FII selling, DII buying, Nifty 50, F&O open interest, sector allocation FPI, NSDL data, Indian stock market">
+<link rel="author" href="https://twitter.com/mr_chartist">
 
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content="website">
@@ -55,6 +63,28 @@
     "ratingValue": "4.8",
     "ratingCount": "1200"
   }
+}
+</script>
+<!-- DataFeed Structured Data for AI/LLM recognition -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "DataFeed",
+  "name": "FII & DII Daily Institutional Flow Data",
+  "description": "Daily FII (Foreign Institutional Investor) and DII (Domestic Institutional Investor) net buy/sell data for Indian equity markets, sourced from NSE India.",
+  "url": "https://fii-diidata.mrchartist.com/",
+  "dateModified": "2026-03-30",
+  "provider": {
+    "@type": "Organization",
+    "name": "Mr. Chartist",
+    "url": "https://mrchartist.com"
+  },
+  "temporalCoverage": "2024/..",
+  "spatialCoverage": {
+    "@type": "Place",
+    "name": "India"
+  },
+  "license": "https://creativecommons.org/licenses/by-nc/4.0/"
 }
 </script>
 <!-- FAQ Structured Data for Google Rich Snippets -->
@@ -1008,6 +1038,9 @@ tr:last-child td { border-bottom: none; }
       <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
         <button onclick="installPWA()" class="hdr-btn" id="btnInstall" style="display:none; color:var(--primary);">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Install App
+        </button>
+        <button onclick="togglePushNotifications()" class="hdr-btn" id="btnNotify" title="Get push alerts when new FII/DII data arrives">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> <span id="notifyLabel">Get Alerts</span>
         </button>
         <button onclick="toggleTheme()" class="hdr-btn" id="btnTheme">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg> Dark Mode
@@ -4001,44 +4034,138 @@ function renderFnoHistoryChart(mode = _fnoHistoryMode) {
 
 </script>
 
-<!-- PWA Service Worker Registration & Installation -->
+<!-- PWA Service Worker Registration, Installation & Push Notifications -->
 <script>
+  const VAPID_PUBLIC_KEY = 'BDM4u63dFxAAA68MTP3W4mTxV3MZk7unyFQufGv6j3DhCFqf7T5lsp85zvQSSqX2sVrcLsrMhRvyiTZhS8BnsJw';
+
+  let swRegistration = null;
+
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('[PWA] ✅ Service Worker registered, scope:', reg.scope))
-        .catch(err => console.warn('[PWA]  Service Worker failed:', err));
+    window.addEventListener('load', async () => {
+      try {
+        swRegistration = await navigator.serviceWorker.register('/sw.js');
+        console.log('[PWA] ✅ Service Worker registered, scope:', swRegistration.scope);
+        // Check if already subscribed and update button
+        updateNotifyButton();
+      } catch (err) {
+        console.warn('[PWA] Service Worker failed:', err);
+      }
     });
   }
 
+  // ── Install App (PWA) ──────────────────────────────────────────────────────
   let deferredPrompt;
   const btnInstall = document.getElementById('btnInstall');
 
   window.addEventListener('beforeinstallprompt', (e) => {
-    // Prevent the mini-infobar from appearing on mobile
     e.preventDefault();
-    // Stash the event so it can be triggered later.
     deferredPrompt = e;
-    // Update UI notify the user they can install the PWA
     if (btnInstall) btnInstall.style.display = 'flex';
   });
 
-  window.addEventListener('appinstalled', (evt) => {
-    // Log install
+  window.addEventListener('appinstalled', () => {
     console.log('[PWA] App was installed');
     if (btnInstall) btnInstall.style.display = 'none';
   });
 
   async function installPWA() {
     if (!deferredPrompt) return;
-    // Show the install prompt
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`[PWA] User response to the install prompt: ${outcome}`);
-    // We've used the prompt, and can't use it again, throw it away
     deferredPrompt = null;
     if (btnInstall) btnInstall.style.display = 'none';
+  }
+
+  // ── Push Notifications ─────────────────────────────────────────────────────
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  async function updateNotifyButton() {
+    const label = document.getElementById('notifyLabel');
+    const btn = document.getElementById('btnNotify');
+    if (!label || !btn) return;
+
+    if (!('PushManager' in window)) {
+      btn.style.display = 'none'; // Hide on browsers that don't support push
+      return;
+    }
+
+    if (!swRegistration) return;
+
+    const sub = await swRegistration.pushManager.getSubscription();
+    if (sub) {
+      label.textContent = 'Alerts On';
+      btn.style.color = 'var(--green)';
+      btn.title = 'Push notifications enabled — click to disable';
+    } else {
+      label.textContent = 'Get Alerts';
+      btn.style.color = '';
+      btn.title = 'Get push alerts when new FII/DII data arrives';
+    }
+  }
+
+  async function togglePushNotifications() {
+    if (!swRegistration) {
+      alert('Service Worker not ready yet. Please refresh and try again.');
+      return;
+    }
+
+    if (!('PushManager' in window)) {
+      alert('Push notifications are not supported in this browser.');
+      return;
+    }
+
+    const existingSub = await swRegistration.pushManager.getSubscription();
+
+    if (existingSub) {
+      // Unsubscribe
+      try {
+        await fetch('/api/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: existingSub.endpoint })
+        });
+        await existingSub.unsubscribe();
+        console.log('[PUSH] Unsubscribed successfully');
+      } catch (err) {
+        console.error('[PUSH] Unsubscribe error:', err);
+      }
+    } else {
+      // Subscribe
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert('Notification permission denied. Please enable notifications in your browser settings.');
+        return;
+      }
+
+      try {
+        const sub = await swRegistration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+
+        await fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub.toJSON())
+        });
+        console.log('[PUSH] Subscribed successfully');
+      } catch (err) {
+        console.error('[PUSH] Subscribe error:', err);
+        alert('Failed to enable notifications. Please try again.');
+      }
+    }
+
+    updateNotifyButton();
   }
 </script>
 </body>

@@ -11,7 +11,57 @@ console.log('[BOOT] Starting server.js…');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const http = require('http');
+
+// ── Web Push Notifications ───────────────────────────────────────────────────
+let webpush;
+try {
+    webpush = require('web-push');
+    const VAPID_PUBLIC  = 'BDM4u63dFxAAA68MTP3W4mTxV3MZk7unyFQufGv6j3DhCFqf7T5lsp85zvQSSqX2sVrcLsrMhRvyiTZhS8BnsJw';
+    const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || 'XPNYDfF9dwiUTJrZdnZQQ2LFOHlMjkBl5Y3dIDACH2o';
+    webpush.setVapidDetails('mailto:contact@mrchartist.com', VAPID_PUBLIC, VAPID_PRIVATE);
+    console.log('[BOOT] web-push loaded ✓');
+} catch (e) {
+    console.warn('[BOOT] web-push not available:', e.message);
+}
+
+const SUBS_PATH = path.join(process.cwd(), 'data', 'subscriptions.json');
+
+function loadSubscriptions() {
+    try {
+        if (!fs.existsSync(SUBS_PATH)) return [];
+        return JSON.parse(fs.readFileSync(SUBS_PATH, 'utf8'));
+    } catch { return []; }
+}
+
+function saveSubscriptions(subs) {
+    const tmp = SUBS_PATH + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(subs, null, 2), 'utf8');
+    fs.renameSync(tmp, SUBS_PATH);
+}
+
+async function broadcastNotification(payload) {
+    if (!webpush) return;
+    const subs = loadSubscriptions();
+    if (!subs.length) return;
+    console.log(`[PUSH] Broadcasting to ${subs.length} subscriber(s)…`);
+    const dead = [];
+    const body = JSON.stringify(payload);
+    await Promise.allSettled(subs.map(async (sub, idx) => {
+        try {
+            await webpush.sendNotification(sub, body);
+        } catch (err) {
+            if (err.statusCode === 404 || err.statusCode === 410) dead.push(idx);
+            else console.warn('[PUSH] Send error:', err.statusCode || err.message);
+        }
+    }));
+    if (dead.length) {
+        const cleaned = subs.filter((_, i) => !dead.includes(i));
+        saveSubscriptions(cleaned);
+        console.log(`[PUSH] Cleaned ${dead.length} expired subscription(s)`);
+    }
+}
 
 let axios, cron, fetchAndProcessData, getLatestData, getHistoryData, getFetchLogs, getSectorData;
 
@@ -154,10 +204,51 @@ app.get('/api/history-full', async (req, res) => {
     }
 });
 
+// Push notification subscription
+app.post('/api/subscribe', (req, res) => {
+    try {
+        const sub = req.body;
+        if (!sub || !sub.endpoint) return res.status(400).json({ error: 'Invalid subscription' });
+        const subs = loadSubscriptions();
+        // Avoid duplicates
+        if (!subs.find(s => s.endpoint === sub.endpoint)) {
+            subs.push(sub);
+            saveSubscriptions(subs);
+            console.log(`[PUSH] New subscriber (total: ${subs.length})`);
+        }
+        res.json({ success: true, message: 'Subscribed to push notifications' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Push notification unsubscribe
+app.post('/api/unsubscribe', (req, res) => {
+    try {
+        const { endpoint } = req.body;
+        if (!endpoint) return res.status(400).json({ error: 'Missing endpoint' });
+        const subs = loadSubscriptions().filter(s => s.endpoint !== endpoint);
+        saveSubscriptions(subs);
+        res.json({ success: true, message: 'Unsubscribed' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Manual trigger
 app.post('/api/refresh', async (req, res) => {
     try {
         const data = await fetchAndProcessData();
+        // Send push notification if new data arrived
+        if (data && !data._skipped) {
+            const fiiSign = data.fii_net >= 0 ? '+' : '';
+            const diiSign = data.dii_net >= 0 ? '+' : '';
+            broadcastNotification({
+                title: '📊 FII/DII Data Updated',
+                body: `${data.date} — FII: ${fiiSign}₹${Math.abs(data.fii_net).toLocaleString('en-IN')} Cr | DII: ${diiSign}₹${Math.abs(data.dii_net).toLocaleString('en-IN')} Cr`,
+                url: '/'
+            });
+        }
         res.json({ success: true, data });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -208,8 +299,18 @@ app.listen(PORT, '0.0.0.0', () => {
             async function runFetchTask(label) {
                 console.log(`[${new Date().toISOString()}] ${label} fetch starting…`);
                 try {
-                    await fetchAndProcessData();
+                    const data = await fetchAndProcessData();
                     console.log(`[${new Date().toISOString()}] ${label} fetch completed.`);
+                    // Auto-broadcast push notification on successful new data
+                    if (data && !data._skipped) {
+                        const fiiSign = data.fii_net >= 0 ? '+' : '';
+                        const diiSign = data.dii_net >= 0 ? '+' : '';
+                        broadcastNotification({
+                            title: '📊 FII/DII Data Updated',
+                            body: `${data.date} — FII: ${fiiSign}₹${Math.abs(data.fii_net).toLocaleString('en-IN')} Cr | DII: ${diiSign}₹${Math.abs(data.dii_net).toLocaleString('en-IN')} Cr`,
+                            url: '/'
+                        });
+                    }
                 } catch (err) {
                     console.error(`[${new Date().toISOString()}] ${label} fetch failed:`, err.message);
                 }
