@@ -1,5 +1,10 @@
 [
   {
+    "ts": "2026-03-30T08:02:09.187Z",
+    "success": false,
+    "error": "Request failed with status code 408"
+  },
+  {
     "ts": "2026-03-30T07:30:00.604Z",
     "success": true,
     "date": "27-Mar-2026",

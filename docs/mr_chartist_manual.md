@@ -3,6 +3,8 @@
 
 Welcome to the ultimate FII/DII tracking dashboard. This tool provides crystal-clear insights into institutional liquidity flows within the Indian equity markets — combining automated data extraction with visually stunning matrices, heatmaps, sector analytics, and momentum indicators.
 
+![Dashboard Hero Overview](dashboard_hero.png)
+
 ---
 
 ## 🏗️ Architecture Overview
@@ -66,9 +68,14 @@ Welcome to the ultimate FII/DII tracking dashboard. This tool provides crystal-c
 - **Date Range Filter**: Custom FROM/TO date filtering
 - **CSV Export**: Download filtered data
 
-### 5. The Flow Strength Meter
+![Flow Analytics Matrix](matrix.png)
+
+### 5. The Flow Strength Meter & 45-Day Heatmaps
 - Calculates total absolute flow (FII + DII volume) and visually maps aggression percentage
 - Shows *who is pushing the market harder* today
+- **45-Day Heatmaps**: GitHub-style activity grid visualizing flow intensity and identifying deep sell-offs and heavy accumulation.
+
+![45-Day Flow Heatmaps](heatmaps.png)
 
 ### 6. Light & Dark Themes
 - **Dark Mode**: OLED-black navy with high-contrast text, ambient background orbs

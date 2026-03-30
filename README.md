@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/screenshots/01_home_fii_dii_date.png" alt="FII & DII Data Dashboard" width="100%">
+  <img src="docs/dashboard_hero.png" alt="FII & DII Data Dashboard Hero" width="100%">
 </p>
 
 # 📊 FII & DII Data — Institutional Money Matrix
@@ -42,6 +42,7 @@ The default landing view showing the **latest extracted session** with:
 - **Quick Stats** — 5-Year cumulative flows, SIP run-rate, FII NSE500 ownership
 - **45-Day Heatmaps** — Color-coded concentration matrices (FII sell depth & DII absorption)
 
+![45-Day Heatmaps](docs/heatmaps.png)
 ![FII/DII Data Tab](public/screenshots/01_home_fii_dii_date.png)
 
 ---
@@ -70,6 +71,7 @@ Complete institutional flow archive with:
 - **CSV Export** — Download filtered data
 - **Expandable Row Details** — Click any row for a breakdown chart + buy/sell ratios
 
+![Databases Matrix](docs/matrix.png)
 ![Flow Analytics Tab](public/screenshots/03_databases_matrices.png)
 
 ---
